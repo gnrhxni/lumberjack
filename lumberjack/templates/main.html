@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+
+{% block title %} Available Buffers {% end %}
+
+{% block body_html %}
+<h1> Available files: </h1>
+
+<ul>
+  {% for fellow in lodge.alive_lumberjacks() %}
+  <li>
+    <div class="fellow_label" id="{{fellow.name}}">
+      {{fellow.name}}
+    </div>
+    <p>Last checked in at: {{fellow.last_checked_in}}</p>
+    <p>Curfew: {{fellow.curfew}}</p>
+    <ul class="lumberfile-list">
+      {% for lumberfile in fellow.lumberfiles %}
+      <li>
+	<div class="lumberfile_label" id="{{lumberfile.slug}}">
+	  <a href="/{{lumberfile.slug}}">{{lumberfile.path}}</a>
+	</div>
+      </li>
+      {% end %}
+    </ul> <!-- end lumberfile-list -->
+  </li>
+  {% end %} <!-- end fellow list -->
+</ul>
+
+{% end %} <!-- end body -->

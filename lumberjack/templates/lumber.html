@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% block title %}{{filename}}{% end %}
+
+{% block body_html %}
+
+<h1>{{filename}}</h1>
+
+<a id="savebutton" target="iframe" download="{{filename}}" href="#" onclick="save();"> Save </a>
+
+{% block lumberbuffer_area %}
+<pre class="lumberbuffer">
+  {{ lumberfile }}
+</pre>
+{% end %}
+
+<script type="text/javascript">
+
+    function save() {
+	$('#savebutton').attr( 'href', 
+			       'data:Content-type: text/plain, '+
+			       escape($('.lumberbuffer').text()) )
+    }
+
+    $(document).ready(function(){
+	var sockurl = document.documentURI+"/socket";
+	sockurl = sockurl.replace(/https?/, "ws");
+	var wsock = new WebSocket(sockurl);
+	
+	wsock.onmessage = function(event) {
+	    $( $.parseJSON(event.data).logs ).each( function(i, item) {
+		$('.lumberbuffer').append(item+'\n')
+	    });
+	}
+	
+	wsock.onopen = function(){
+	    console.log("Connection to "+sockurl+" succeeded.");
+	}
+	
+	wsock.onclose = function(){
+	    console.log("Connection to "+sockurl+" closed.");
+	}
+    });
+</script>
+    
+{% end %} <!-- end body -->
+    
