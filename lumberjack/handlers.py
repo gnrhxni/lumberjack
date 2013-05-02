@@ -13,6 +13,8 @@ from __future__ import absolute_import
 
 import logging
 
+log = logging.getLogger(__name__)
+
 import tornado.gen
 import tornado.web
 import tornado.ioloop
@@ -20,10 +22,10 @@ import tornado.websocket
 import tornado.httpclient
 from tornado.options import options
 
+from .models import Fellow
 from .util import (
     slug, deslug,
 )
-
 
 class BaseHandler(tornado.web.RequestHandler):
 
@@ -70,13 +72,13 @@ class LodgeHandler(BaseHandler):
     def post(self):
         fellow = Fellow.deserialize(self.request.body)
         if fellow.alive():
-            logging.debug('Fellow %s checked in', fellow.name)
-            if fellow.name in self.lodge:
-                self.lodge[fellow.name].last_checked_in = fellow.last_checked_in
+            log.debug('Fellow %s checked in', fellow.name)
+            if fellow.name in self.lodge.fellows:
+                self.lodge.fellows[fellow.name].last_checked_in = fellow.last_checked_in
             else:
-                self.lodge[fellow.name] = fellow
+                self.lodge.fellows[fellow.name] = fellow
         else: # not alive
-            logging.warning('Fellow lumberjack %s tried to check '+
+            log.warning('Fellow lumberjack %s tried to check '+
                             'in past curfew. Denied.', fellow.name)
 
 
@@ -88,9 +90,9 @@ class LumberHandler(BaseHandler):
 
     @tornado.web.asynchronous
     def get(self, lumberfile):
-        logging.debug(lumberfile)
+        log.debug(lumberfile)
         lumberfile = deslug(lumberfile)
-        logging.debug(lumberfile)
+        log.debug(lumberfile)
 
         if lumberfile in self.cache:
             if self.sender_wants_json():
@@ -106,7 +108,7 @@ class LumberHandler(BaseHandler):
                 
                 self.cache[lumberfile].subscribe( id(self.request), _push )
 
-                logging.debug( "Subscribed as streaming request: %s" % (lumberfile) )
+                log.debug( "Subscribed as streaming request: %s" % (lumberfile) )
             else:
                 self.render( "lumber.html", 
                              filename=lumberfile, 
@@ -127,7 +129,7 @@ class LumberSocket(tornado.websocket.WebSocketHandler):
         self.lumberfile = deslug(lumberfile)
         self.cache[self.lumberfile].subscribe( id(self.stream), 
                                                lambda data: self.write_message(dict(logs=data)) )
-        logging.debug( "Subscribed as websocket: %s" % (self.lumberfile) )
+        log.debug( "Subscribed as websocket: %s" % (self.lumberfile) )
 
     def on_message(self):
         pass
@@ -135,7 +137,7 @@ class LumberSocket(tornado.websocket.WebSocketHandler):
     def on_close(self):
         # unsubscribe to the lumberbuffer
         self.cache[self.lumberfile].unsubscribe( id(self.stream) )
-        logging.debug( "Unsubscribed from websocket: %s" % (self.lumberfile) )
+        log.debug( "Unsubscribed from websocket: %s" % (self.lumberfile) )
 
 
 
@@ -157,7 +159,7 @@ class ProxyHandler(BaseHandler):
                                        request,
                                        output_stream=self ) 
             # once ProxyStreamer is instantiated, it'll keep writing things to the handler
-            logging.debug( "Subscribed as streaming proxy host %s file: %s" 
+            log.debug( "Subscribed as streaming proxy host %s file: %s" 
                            % (self.host, self.lumberfile) )
         else:
             self.render( "proxy.html", 
@@ -167,7 +169,7 @@ class ProxyHandler(BaseHandler):
 
     def on_connection_close(self):
         self.conn.close()
-        logging.debug( "Unsubscribed as streaming proxy host %s file: %s" 
+        log.debug( "Unsubscribed as streaming proxy host %s file: %s" 
                        % (self.host, self.lumberfile) )
 
 
@@ -189,7 +191,7 @@ class ProxySocket(tornado.websocket.WebSocketHandler):
                                    output_stream=self, 
                                    as_websocket=True ) 
 
-        logging.debug( "Subscribed as websocket proxy to host %s file %s" 
+        log.debug( "Subscribed as websocket proxy to host %s file %s" 
                        % (self.host, self.lumberfile) )
 
 
@@ -199,6 +201,6 @@ class ProxySocket(tornado.websocket.WebSocketHandler):
 
     def on_close(self):
         self.conn.close()
-        logging.debug( "Unsubscribed websocket proxy to host %s file %s" 
+        log.debug( "Unsubscribed websocket proxy to host %s file %s" 
                        % (self.host, self.lumberfile) )
 

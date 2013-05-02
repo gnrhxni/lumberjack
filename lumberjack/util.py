@@ -31,9 +31,15 @@ def now():
     return datetime.datetime.now()
 
 
-def serialize(*args, **kwargs):
-    return json.dumps(*args, **kwargs)
+def _default_serializer(obj):
+    if hasattr(obj, '_serialize'):
+        return obj._serialize()
+    else:
+        return TypeError(repr(obj)+" is not serializable")
+
+def serialize(obj):
+    return json.dumps(obj, default=_default_serializer)
 
 
-def deserialize(*args, **kwargs):
-    return json.loads(*args, **kwargs)
+def deserialize(obj):
+    return json.loads(obj)

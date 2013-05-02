@@ -17,6 +17,8 @@ import datetime
 from collections import deque
 from functools import partial
 
+log = logging.getLogger(__name__)
+
 import tornado.ioloop
 import tornado.websocket
 import tornado.httpclient
@@ -44,7 +46,8 @@ class Lodge(object):
         else:
             # connect to a current lodge
             self.host = host
-            self.fellow = fellow
+            self.fellows = dict( )
+            self.fellows[fellow.name] = fellow
             self.httpclient = tornado.httpclient.AsyncHTTPClient()
             self.authoritative = False
             check_in_func = partial(self.check_in_remotely, fellow)
@@ -56,24 +59,27 @@ class Lodge(object):
 
     def check_in_locally(self, fellow):
         self.fellows[fellow.name].last_checked_in = now()
-        logging.debug('Locally posted check-in for %s', fellow.name)
+        log.debug('Locally posted check-in for %s', fellow.name)
 
     
     def check_in_remotely(self, fellow):
         def _check_in_cb(resp):
             if resp.code == 200:
-                logging.debug('Posted check-in: %d', resp.code)
+                log.debug('Posted check-in: %d', resp.code)
             else:
                 msg = ('Failed to post check-in.\n'+
                        '%d: %s'%(resp.code, resp.body))
-                logging.error(msg)
+                log.error(msg)
 
         fellow.last_checked_in = now()
+
+        if log.isEnabledFor(logging.DEBUG):
+            log.debug("Posting check-in: %s", serialize(fellow))
 
         request = tornado.httpclient.HTTPRequest(
             url="http://"+self.host+":"+str(options.listenport)+"/lodge",
             method="POST",
-            body=fellow.serialize()
+            body=serialize(fellow)
             )
 
         self.httpclient.fetch( request, callback=_check_in_cb )
@@ -83,13 +89,12 @@ class Lodge(object):
         return [ fellow for fellow in self.fellows.values() if fellow.alive() ]
 
 
-    def serialize(self):
-        return serialize(self.fellows)
-
-        
-    def __reduce__(self):
-        return self.serialize()
-
+    def _serialize(self):
+        return dict( 
+            host=self.host,
+            fellows=self.fellows
+            )
+    
 
 
 class Fellow(object):
@@ -102,27 +107,27 @@ class Fellow(object):
         self.last_checked_in = now() if last_checked_in is None else last_checked_in
 
 
-    def serialize(self):
-        return serialize( dict(
-                name=self.name,
-                curfew=self.curfew.seconds,
-                last_checked_in=self.last_checked_in.strftime('%s'),
-                lumberfiles=lumberfiles.serialize()
-                ))
+    def _serialize(self):
+        return dict( 
+            name=self.name,
+            curfew=self.curfew.seconds,
+            last_checked_in=self.last_checked_in.strftime('%s'),
+            lumberfiles=self.lumberfiles
+            )
 
 
     @staticmethod
     def deserialize(fellow):
         data = deserialize(fellow)
+        data['last_checked_in'] = datetime.datetime.fromtimestamp(
+            float(data['last_checked_in']) )
+        data['curfew'] = datetime.timedelta(seconds=data['curfew'])
+        data['lumberfiles'] = [ AttrBag(**l) for l in data['lumberfiles'] ]
         return Fellow(**data)
 
             
     def alive(self):
         return (now() - self.last_checked_in) < self.curfew
-
-    
-    def __reduce__(self):
-        return self.serialize()
 
     
 
@@ -204,10 +209,15 @@ class AttrBag(object):
     def __init__(self, *args, **kwargs):
         self.__dict__.update(kwargs)
 
+
     def __repr__(self):
-        return 'AttrBag: '+str(self.__dict__)
+        return str(self.__dict__)
 
-    def serialize(self):
-        return serialize(self.__dict__)
 
-    
+    def _serialize(self):
+        return self.__dict__
+
+    @staticmethod
+    def deserialize(s):
+
+        return AttrBag(**deserialize(s))
