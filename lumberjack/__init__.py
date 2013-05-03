@@ -81,8 +81,9 @@ def setup_global_models(logs_to_stream):
             streaming_callback=partial(_logstream_cb, 
                                        lumberbuffer=lumberbuffers[filename])
             )
-    
-    lodge = Lodge(me, host=options.lodge)
+
+    # make a lodge with just me in it
+    lodge = Lodge([me,], host=options.lodge)
 
     return (lumberbuffers, lodge)
 

@@ -29,32 +29,40 @@ from .util import (
     now
 )
 
-DEFAULT_CURFEW = datetime.timedelta(minutes=20)
-DEFAULT_FELLOW_NAME = socket.gethostname()
+hostname = socket.gethostname()
+
+DEFAULT_CURFEW      = datetime.timedelta(minutes=20)
+DEFAULT_FELLOW_NAME = hostname
+DEFAULT_LODGE_NAME  = hostname
 
 
 class Lodge(object):
     """ Where all the lumberjacks check in. Shows living lumberjacks"""
 
-    def __init__(self, fellow, host=None):
+    def __init__(self, fellows, host=None, check_in=True):
         if host is None:
             # start your own lodge
-            self.fellows = dict( )
-            self.fellows[fellow.name] = fellow
+            self.host = DEFAULT_FELLOW_NAME
+            self.fellows = dict( [(f.name, f) for f in fellows] )
             self.authoritative = True
-            check_in_func = partial(self.check_in_locally, fellow)
+            if check_in:
+                check_in_func = partial(self.check_in_locally, fellows[0])
         else:
             # connect to a current lodge
             self.host = host
-            self.fellows = dict( )
-            self.fellows[fellow.name] = fellow
-            self.httpclient = tornado.httpclient.AsyncHTTPClient()
+            self.fellows = dict( [(f.name, f) for f in fellows] )
             self.authoritative = False
-            check_in_func = partial(self.check_in_remotely, fellow)
+            if check_in:
+                self.httpclient = tornado.httpclient.AsyncHTTPClient()
+                check_in_func = partial(self.check_in_remotely, fellows[0])
 
-        check_in_func()
-        check_in_frequency = (fellow.curfew.seconds - 10) * 1000 # in ms
-        tornado.ioloop.PeriodicCallback( check_in_func, check_in_frequency ).start()
+        if check_in:
+            check_in_func()
+            check_in_frequency = (fellows[0].curfew.seconds - 10) * 1000 # in ms
+            tornado.ioloop.PeriodicCallback(
+                check_in_func,
+                check_in_frequency
+                ).start()
             
 
     def check_in_locally(self, fellow):
@@ -92,9 +100,22 @@ class Lodge(object):
     def _serialize(self):
         return dict( 
             host=self.host,
-            fellows=self.fellows
+            fellows=list( self.fellows.values() )
             )
-    
+
+
+    @staticmethod
+    def from_dict(data):
+        data['fellows'] = [ Fellow.from_dict(f) for f in data['fellows'] ]
+        return Lodge( data['fellows'],
+                      host=data['host'],
+                      check_in=False )        
+
+
+    @staticmethod
+    def deserialize(obj):
+        data = deserialize(obj)['lodge']
+        return Lodge.from_dict(data)
 
 
 class Fellow(object):
@@ -115,15 +136,20 @@ class Fellow(object):
             lumberfiles=self.lumberfiles
             )
 
-
+    
     @staticmethod
-    def deserialize(fellow):
-        data = deserialize(fellow)
+    def from_dict(data):
         data['last_checked_in'] = datetime.datetime.fromtimestamp(
             float(data['last_checked_in']) )
         data['curfew'] = datetime.timedelta(seconds=data['curfew'])
         data['lumberfiles'] = [ AttrBag(**l) for l in data['lumberfiles'] ]
         return Fellow(**data)
+
+
+    @staticmethod
+    def deserialize(fellow):
+        data = deserialize(fellow)
+        return Fellow.from_dict(data)
 
             
     def alive(self):
@@ -217,7 +243,12 @@ class AttrBag(object):
     def _serialize(self):
         return self.__dict__
 
+
+    @staticmethod
+    def from_dict(datat):
+        return AttrBag(**data)
+
+
     @staticmethod
     def deserialize(s):
-
-        return AttrBag(**deserialize(s))
+        return AttrBag.from_dict(deserialize(s))

@@ -22,9 +22,13 @@ import tornado.websocket
 import tornado.httpclient
 from tornado.options import options
 
-from .models import Fellow
+from .models import (
+    Fellow,
+    Lodge
+)
 from .util import (
     slug, deslug,
+    serialize
 )
 
 class BaseHandler(tornado.web.RequestHandler):
@@ -36,7 +40,7 @@ class BaseHandler(tornado.web.RequestHandler):
 
     def render_template_or_json(self, template, *args, **kwargs):
         if self.sender_wants_json():
-            return self.write(kwargs)
+            return self.write( serialize(kwargs) )
         else:
             return self.render(template, **kwargs)
 
@@ -56,11 +60,11 @@ class MainHandler(BaseHandler):
         else:
             client = tornado.httpclient.AsyncHTTPClient()
             response = yield client.fetch( 
-                "http://"+self.host+":"+options.listenport+"/",
+                "http://"+self.lodge.host+":"+str(options.listenport)+"/",
                 headers=dict(Accept="application/json")
                 )
             self.render_template_or_json( "main.html", 
-                                          lodge=response.body )
+                                          lodge=Lodge.deserialize(response.body) )
 
 
 class LodgeHandler(BaseHandler):
@@ -90,9 +94,7 @@ class LumberHandler(BaseHandler):
 
     @tornado.web.asynchronous
     def get(self, lumberfile):
-        log.debug(lumberfile)
         lumberfile = deslug(lumberfile)
-        log.debug(lumberfile)
 
         if lumberfile in self.cache:
             if self.sender_wants_json():
