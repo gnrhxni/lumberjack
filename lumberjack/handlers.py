@@ -24,12 +24,14 @@ from tornado.options import options
 
 from .models import (
     Fellow,
+    DEFAULT_FELLOW_NAME,
     Lodge
 )
 from .util import (
     slug, deslug,
     serialize
 )
+
 
 class BaseHandler(tornado.web.RequestHandler):
 
@@ -40,6 +42,7 @@ class BaseHandler(tornado.web.RequestHandler):
 
     def render_template_or_json(self, template, *args, **kwargs):
         if self.sender_wants_json():
+            self.set_header('Content-Type', 'application/json')
             return self.write( serialize(kwargs) )
         else:
             return self.render(template, **kwargs)
@@ -55,16 +58,31 @@ class MainHandler(BaseHandler):
     @tornado.web.asynchronous
     @tornado.gen.coroutine
     def get(self):
-        if self.lodge.authoritative:
-            self.render_template_or_json("main.html", lodge=self.lodge)
-        else:
+        if not self.lodge.authoritative:
             client = tornado.httpclient.AsyncHTTPClient()
             response = yield client.fetch( 
                 "http://"+self.lodge.host+":"+str(options.listenport)+"/",
                 headers=dict(Accept="application/json")
                 )
-            self.render_template_or_json( "main.html", 
-                                          lodge=Lodge.deserialize(response.body) )
+            log.debug("Lodge get - received response from remote: %s", 
+                      response.body)
+            self.lodge=Lodge.deserialize(response.body)
+
+        fellows = self.lodge.alive_lumberjacks()
+
+        # good candidate for caching if it comes to that
+        for fellow in fellows:
+            if fellow.name != DEFAULT_FELLOW_NAME:
+                if not hasattr(fellow, 'munged'):
+                    for f in fellow.lumberfiles:
+                        f.slug = fellow.name+'/'+f.slug
+                    fellow.munged = True
+                        
+        if self.sender_wants_json():
+            self.write(serialize(self.lodge))
+        else:
+            self.render("main.html", fellows=fellows)
+
 
 
 class LodgeHandler(BaseHandler):

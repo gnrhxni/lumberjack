@@ -114,7 +114,7 @@ class Lodge(object):
 
     @staticmethod
     def deserialize(obj):
-        data = deserialize(obj)['lodge']
+        data = deserialize(obj)
         return Lodge.from_dict(data)
 
 
@@ -155,7 +155,7 @@ class Fellow(object):
     def alive(self):
         return (now() - self.last_checked_in) < self.curfew
 
-    
+
 
 class LumberBuffer(deque):
     """

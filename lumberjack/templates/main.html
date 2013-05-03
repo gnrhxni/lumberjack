@@ -6,7 +6,7 @@
 <h1> Available files: </h1>
 
 <ul>
-  {% for fellow in lodge.alive_lumberjacks() %}
+  {% for fellow in fellows %}
   <li>
     <div class="fellow_label" id="{{fellow.name}}">
       {{fellow.name}}

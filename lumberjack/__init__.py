@@ -50,7 +50,7 @@ define( 'lodge',      default=None,
         "lumberjacks. Defaults to set up a lodge that other "+
         "lumberjacks can connect to.",
         type=str )
-define( 'name',      default=socket.gethostname(), 
+define( 'name',       default=socket.gethostname(), 
         help="If using a lodge, use this name to identify myself. "+
         "Defaults to the system hostname",
         type=str )
