@@ -66,17 +66,17 @@ class MainHandler(BaseHandler):
                 )
             log.debug("Lodge get - received response from remote: %s", 
                       response.body)
-            self.lodge=Lodge.deserialize(response.body)
+            lodge=Lodge.deserialize(response.body)
+        else:
+            lodge = self.lodge
 
-        fellows = self.lodge.alive_lumberjacks()
+        fellows = [ fel.copy() for fel in lodge.alive_lumberjacks() ]
 
-        # good candidate for caching if it comes to that
         for fellow in fellows:
-            if fellow.name != DEFAULT_FELLOW_NAME:
-                if not hasattr(fellow, 'munged'):
-                    for f in fellow.lumberfiles:
-                        f.slug = fellow.name+'/'+f.slug
-                    fellow.munged = True
+            if fellow.name != DEFAULT_FELLOW_NAME and \
+               fellow.name not in fellow.lumberfiles[0].slug:
+                for f in fellow.lumberfiles:
+                    f.slug = fellow.name+'/'+f.slug
                         
         if self.sender_wants_json():
             self.write(serialize(self.lodge))
@@ -90,6 +90,9 @@ class LodgeHandler(BaseHandler):
     def initialize(self, lodge=None):
         self.lodge = lodge
 
+
+    def get(self):
+        self.write(serialize(self.lodge))
 
     def post(self):
         fellow = Fellow.deserialize(self.request.body)

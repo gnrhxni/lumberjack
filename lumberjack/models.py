@@ -137,6 +137,9 @@ class Fellow(object):
             )
 
     
+    def copy(self):
+        return Fellow(**self.__dict__.copy())
+
     @staticmethod
     def from_dict(data):
         data['last_checked_in'] = datetime.datetime.fromtimestamp(
