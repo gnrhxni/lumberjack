@@ -25,7 +25,8 @@ from tornado.options import options
 from .models import (
     Fellow,
     DEFAULT_FELLOW_NAME,
-    Lodge
+    Lodge,
+    ProxyStreamer
 )
 from .util import (
     slug, deslug,
