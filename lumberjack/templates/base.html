@@ -3,19 +3,37 @@
   <head>
     <title>{% block title %} Lumberjack {% end %}</title>
     <meta charset="utf=8" />
-    <link href='http://fonts.googleapis.com/css?family=Open+Sans' rel='stylesheet' type='text/css'>
+    <link href="//netdna.bootstrapcdn.com/twitter-bootstrap/2.3.1/css/bootstrap-combined.min.css" rel="stylesheet">
     <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
     {% block extra_head %} {% end %}
-    
+
+    <style type="text/css">
+      body {
+      padding-top: 60px;
+      padding-bottom: 40px;
+      }
+    </style>
+
   </head>
   <body>
-    <div class="header">
-      <a href="/" > Lumberjack </a>
-      {% block header_html %} {% end %}
-    </div> <!-- end header -->
+    <div class="container-fluid">
+      
+      <div class="navbar navbar-fixed-top">
+	<div class="navbar-inner">
+	  <div class="container">
+	    <a href="/" class="brand" > Lumberjack </a>
+	    <ul class="nav">
+	      {% block nav_list %} {% end %}
+	    </ul>
+	    {% block extra_nav %} {% end %}
+	  </div>
+	</div>
+      </div> <!-- end navbar -->
 
     {% block body_html %} {% end %}
 
+    </div> <!-- end container -->
+    <script src="//netdna.bootstrapcdn.com/twitter-bootstrap/2.3.1/js/bootstrap.min.js"></script>
   </body>
 </html>
   

@@ -1,20 +1,50 @@
 {% extends "base.html" %}
 
+
+
 {% block title %}{{filename}}{% end %}
+
+
+
+{% block nav_list %} 
+
+<li><a>{{filename}}</a></li>
+
+{% end %}
+
+{% block extra_nav %}
+<div class="pull-right">
+  <button class="btn btn-success" id="autosc" onclick="autoscroll();"> AutoScroll </button>
+  <a class="btn btn-info" id="savebutton" target="iframe" download="{{filename}}" href="#" onclick="save();"> Save </a>
+</div>
+{% end %}
+
+
 
 {% block body_html %}
 
-<h1>{{filename}}</h1>
+  {% block lumberbuffer_area %}
+    <pre class="lumberbuffer">
+      {{ lumberfile }}
+    </pre>
+  {% end %}
 
-<a id="savebutton" target="iframe" download="{{filename}}" href="#" onclick="save();"> Save </a>
+  <div id="bottom" />
 
-{% block lumberbuffer_area %}
-<pre class="lumberbuffer">
-  {{ lumberfile }}
-</pre>
-{% end %}
+  <script type="text/javascript">
 
-<script type="text/javascript">
+     function autoscroll() {
+	 window.autosc = ! window.autosc
+	 $('#autosc').attr('class', function(i, val){
+	     return window.autosc === true ? 'btn btn-danger' : 'btn btn-success'
+	 });
+	 if (window.autosc === true) {
+	     window.onData = function(numRows){ location.assign('#bottom'); };
+	 } else {
+	     window.onData = function(numRows){ };
+	 }
+     }
+
 
     function save() {
 	$('#savebutton').attr( 'href', 
@@ -22,8 +52,11 @@
 			       escape($('.lumberbuffer').text()) )
     }
 
+
     $(document).ready(function(){
-	var sockurl = document.documentURI+"/socket";
+	window.autosc = false;
+	window.onData = function(numRows){ }; //no-op
+	var sockurl = document.documentURI.replace(/#.*/, "")+"/socket";
 	sockurl = sockurl.replace(/https?/, "ws");
 	var wsock = new WebSocket(sockurl);
 	
@@ -31,6 +64,7 @@
 	    $( $.parseJSON(event.data).logs ).each( function(i, item) {
 		$('.lumberbuffer').append(item+'\n')
 	    });
+	    window.onData();
 	}
 	
 	wsock.onopen = function(){
@@ -41,7 +75,7 @@
 	    console.log("Connection to "+sockurl+" closed.");
 	}
     });
-</script>
+  </script>
     
 {% end %} <!-- end body -->
     
