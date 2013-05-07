@@ -26,6 +26,7 @@ setup(
     entry_points= {
         'console_scripts': [
             'lumberjack = lumberjack:main',
+            'sluice = lumberjack.sluice:main',
         ],
     }
 )
