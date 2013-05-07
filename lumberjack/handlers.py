@@ -119,6 +119,7 @@ class LumberHandler(BaseHandler):
         lumberfile = deslug(lumberfile)
 
         if lumberfile in self.cache:
+            self.lumberfile = lumberfile
             if self.sender_wants_json():
                 # stream it out in json forever by keeping the request open
                 # note: tornado writes json whenever you give a dict to 
@@ -142,6 +143,11 @@ class LumberHandler(BaseHandler):
             self.flush()
             self.finish()
 
+    def on_connection_close(self):
+        self.cache[self.lumberfile].unsubscribe( id(self.request) )
+        log.debug( "Unsubscribed from httpstream. file: %s" 
+                       % (self.lumberfile) )
+
 
 
 class LumberSocket(tornado.websocket.WebSocketHandler):
@@ -159,7 +165,7 @@ class LumberSocket(tornado.websocket.WebSocketHandler):
         pass
 
     def on_close(self):
-        # unsubscribe to the lumberbuffer
+        # unsubscribe from the lumberbuffer
         self.cache[self.lumberfile].unsubscribe( id(self.stream) )
         log.debug( "Unsubscribed from websocket: %s" % (self.lumberfile) )
 
