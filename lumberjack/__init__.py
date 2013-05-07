@@ -19,6 +19,8 @@ import socket
 import logging
 from functools import partial
 
+log = logging.getLogger(__name__)
+
 import tornado.web
 import tornado.ioloop
 import tornado.process
@@ -97,7 +99,7 @@ def main():
         # of the line. For example lumberjack log1 log2 --logging=debug
         # gives ['log1', 'log2', '--logging=debug'].
         lumberbuffers, lodge = setup_global_models(
-            [log for log in logs_to_stream if not log.startswith('--')]
+            [l for l in logs_to_stream if not l.startswith('--')]
             )
             
     routes = (
@@ -124,7 +126,11 @@ def main():
     app.listen(options.listenport)
 
     ioloop = tornado.ioloop.IOLoop.instance()
-    ioloop.start()
+
+    try:
+        ioloop.start()
+    except KeyboardInterrupt:
+        log.info('Keyboard interrupt. Shutting down...')
 
 
 if __name__ == "__main__":
