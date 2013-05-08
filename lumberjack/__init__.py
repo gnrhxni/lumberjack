@@ -15,6 +15,7 @@
 from __future__ import absolute_import
 
 import os
+import sys
 import socket
 import logging
 from functools import partial
@@ -101,6 +102,10 @@ def main():
         lumberbuffers, lodge = setup_global_models(
             [l for l in logs_to_stream if not l.startswith('--')]
             )
+    else:
+        sys.stderr.write("Didn't specify any files to stream\n")
+        options.print_help()
+        sys.exit(1)
             
     routes = (
         ( r'/', MainHandler, 
