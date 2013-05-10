@@ -37,9 +37,16 @@ def _default_serializer(obj):
     else:
         return TypeError(repr(obj)+" is not serializable")
 
+
 def serialize(obj):
     return json.dumps(obj, default=_default_serializer)
 
 
 def deserialize(obj):
     return json.loads(obj)
+
+
+def import_config_file(f, globs, locs):
+    code = compile(f.read(), '<string>', 'exec')
+    exec(code, globs, locs)
+

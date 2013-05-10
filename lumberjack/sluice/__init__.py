@@ -12,18 +12,19 @@
 from __future__ import absolute_import
 
 import sys
+import time
 import logging
 import optparse
 import importlib
-from functools import wraps
 from itertools import chain
 
 log = logging.getLogger(__name__)
 
 import tornado.ioloop
-import tornado.httpclient
 
-from .util import deserialize
+from .models import Sluice
+from ..util import import_config_file
+
 
 opt_list = [
     optparse.make_option('-c', '--config', action="store", type="string",
@@ -32,63 +33,39 @@ opt_list = [
     optparse.make_option('-l', '--logging', action="store", type="string",
                          dest="logging", default="INFO",
                          help="Logging verbosity, options are debug, info, "+
-                         "warning, and critical")
+                         "warning, and critical"),
+    optparse.make_option('-i', '--report-interval', action="store", type="int",
+                         dest="report_interval", default=10,
+                         help="If logging is at info or debug, print reports "+
+                         "at this interval in seconds. Default: 10")
     ]
 
-alive_connections = dict()
-
-def parsefxn_wrapper(f, url):
-    @wraps(f, assigned=[], updated=('__dict__',))
-    def wrapper(*args, **kwargs):
-        data, con = args[0], alive_connections[url]
-        con['raw_received'] += len(data)
-        data = deserialize(data)
-        con['des_received'] += len(data)
-        try:
-            return f(*args, **kwargs)
-        except Exception as e:
-            log.exception(e)
-    return wrapper
-
-
-def import_config_file(f, globs, locs):
-    code = compile(f.read(), '<string>', 'exec')
-    exec(code, globs, locs)
+open_sluices = dict()
 
 
 def print_report(conns):
-    """Nicely print out alive_connections"""
+    """Nicely print out open_sluices"""
+
     message = list()
-    for key, val in conns.iteritems():
+    for url, sluice in conns.iteritems():
         message.append( 
-            key + '\t' + '\t'.join([str(v) for v in val.values()]) 
+            url + '\t' + '\t'.join([str(v) for v in 
+                                    sluice.stats.__dict__.values()]) 
         )
-    header = '\t'.join( chain(['host'], conns.values()[0].keys()) )
+    header = '\t'.join( chain(['host'], conns.values()[0].stats.__dict__.keys()) )
     lines = '-'*len(max(message))
     print >> sys.stderr, lines
     print >> sys.stderr, header
     print >> sys.stderr, lines
     print >> sys.stderr, '\n'.join(message)
     print >> sys.stderr, lines
-
-
-def add_stream(url, parsefxn):
-    request = tornado.httpclient.HTTPRequest( 
-        url,
-        connect_timeout=30,
-        request_timeout=0,
-        streaming_callback=parsefxn_wrapper(parsefxn, url),
-        headers=dict(Accept="application/json")
-    )
-    alive_connections[url] = dict( conn=tornado.httpclient.AsyncHTTPClient(),
-                                   raw_received=int(),
-                                   des_received=int() )
-    alive_connections[url]['conn'].fetch(request)
-    
-    log.info( "Subscribed: "+ url)
         
 
 def main():
+    """Command line interface for sluices"""
+
+    global open_sluices
+
     parser = optparse.OptionParser(option_list=opt_list)
     (opts, args) = parser.parse_args()
     logging.getLogger().setLevel(getattr(logging, opts.logging.upper()))
@@ -100,19 +77,24 @@ def main():
         print >> sys.stderr, "Couldn't find a config file to parse"
         parser.print_help()
         sys.exit(1)
-        
+
     ioloop = tornado.ioloop.IOLoop.instance()
-        
-    for sluice, cfg in opts.sluice_config.iteritems():
-        log.info('Adding stream for %s', sluice)
-        add_stream( sluice, cfg['parser'] )
+
+    for url, cfg in opts.sluice_config.iteritems():
+        log.info('Adding sluice for %s', url)
+        open_sluices[url] = Sluice( 
+            url, 
+            cfg['parser'],
+            io_loop=ioloop
+        ).open()
         
     if opts.logging.upper() in ('INFO', 'DEBUG'):
+        # periodically print reports
         tornado.ioloop.PeriodicCallback(
-            callback=lambda : print_report(alive_connections),
-            callback_time=(10*1000), # 10 s in ms
+            callback=lambda : print_report(open_sluices),
+            callback_time=(opts.report_interval*1000), # in ms
             io_loop=ioloop
-            ).start()
+        ).start()
 
     log.info('Starting streaming now...')
 
@@ -121,7 +103,8 @@ def main():
     except KeyboardInterrupt:
         print >> sys.stderr, "Shutting down..."
     finally:
-        [ val['conn'].close() for val in alive_connections.values() ]
+        [ val.close() for val in open_sluices.values() ]
+
 
 if __name__ == '__main__':
-        main()
+    main()

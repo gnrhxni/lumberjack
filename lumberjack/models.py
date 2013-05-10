@@ -255,3 +255,4 @@ class AttrBag(object):
     @staticmethod
     def deserialize(s):
         return AttrBag.from_dict(deserialize(s))
+
