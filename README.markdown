@@ -43,3 +43,32 @@ For example:
 
 Or if you're a websockets type of person, 
 try pointing a client at ws://host1.example.tld:9098/log1.log/socket
+
+
+## Sluice - Easy lumberjack output manipulation
+`sluice` is a framework for dumping output from log streams into a python
+ function of your choice. 
+Point `sluice` at a "sluice_config", and it'll connect up to the 
+ lumberjacks you define and stream its output into any function.
+
+Sluice configs are any python module that has a `sluice_config` dictionary
+ as an attribute. The sluice_config dictionary should a list of key/value 
+ pairs in the form of `url : { 'parser': your_amazing_function } `
+ For example:
+
+    from functools import partial
+
+
+    def echoparse(url, chunk):
+    	print url, chunk
+
+    
+
+    sluice_config = {
+
+        'http://db3.example.tld:9097/database.log': { 'parser': partial(echoparse, 'dev:log2') },
+        
+        'http://frontend5.example.tld:9097/debug.log': { 'parser': partial(echoparse, 'stage:log3') },
+        
+        
+    }
