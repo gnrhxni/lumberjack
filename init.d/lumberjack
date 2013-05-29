@@ -1,0 +1,109 @@
+#!/bin/bash
+#
+# httpd        Startup script for the Lumberjack file streamer
+#
+# chkconfig: - 85 15
+# description: Lumberjack streams file changes over http and websockets
+# processname: lumberjack
+# config: /etc/sysconfig/lumberjack
+# pidfile: /var/run/httpd.pid
+
+# Source function library.
+. /etc/rc.d/init.d/functions
+
+# establish defaults
+pidfile=/var/run/lumberjack.pid
+lockfile=/var/lock/subsys/lumberjack.lock
+wait_timeout=10
+prog=lumberjack
+loglevel=info
+listenport=9095
+logdir=/var/log/lumberjack
+files_to_stream="/var/log/php.log /home/rschwager/lumberjack/scratch/log1.log"
+# done_defaults
+
+if [ -f /etc/sysconfig/lumberjack ]; then
+    . /etc/sysconfig/lumberjack
+else
+    printf 'Could not find the defaults file in /etc/sysconfig' >&2
+    failure 'Config file check'
+    echo
+    exit 1
+fi
+
+RETVAL=0
+baseprog=$(basename $prog)
+start() {
+    local p=3
+    printf "Starting %s\t" $baseprog
+    [ -d $logdir ] || mkdir -v $logdir
+    if [ -z "$files_to_stream" ]; then 
+	failure "Required parameter check"
+	echo
+	echo "Lumberjack: No files to stream"
+	exit 1
+    fi
+
+    $prog --listenport=$listenport \
+	--logging=$loglevel \
+	--log-file-prefix=$logdir/$baseprog \
+	$files_to_stream &
+
+    p=$!
+    RETVAL=$?
+    disown %1
+    if [ $RETVAL = 0 ]; then
+	touch ${lockfile}
+	echo $p > $pidfile 
+	success "Started lumberjack"
+	echo
+    fi
+    return $RETVAL
+}
+
+stop () {
+    printf "Stopping %s\t" $baseprog
+
+    if [ ! -f $pidfile ]; then 
+	RETVAL=1
+	failure "No pidfile"
+	echo
+	echo "No pidfile found in $pidfile"
+	exit 1
+    fi
+
+    childprocs=$(ps axj | awk '$1=='$(cat $pidfile)'{print $2;}' | xargs)
+    killproc -p $pidfile -d $wait_timeout $prog 
+    RETVAL=$?
+    echo
+    if [ $RETVAL = 0 ]; then
+	rm -f ${lockfile} ${pidfile}
+	kill $childprocs
+	success "Stopped lumberjack"
+    fi
+}
+
+case "$1" in
+  start)
+	start
+	;;
+  stop)
+	stop
+	;;
+  status)
+        status -p ${pidfile} $prog
+	RETVAL=$?
+	;;
+  restart)
+	stop
+	start
+	;;
+  *)
+	echo $"Usage: $baseprog {start|stop|restart|status}"
+	exit 1
+esac
+
+exit $RETVAL
+
+
+

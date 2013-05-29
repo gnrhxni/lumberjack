@@ -1,0 +1,102 @@
+#!/bin/bash
+#
+# httpd        Startup script for Sluice
+#
+# chkconfig: - 85 15
+# description: Sluice hooks up to Lumberjack for easy data stream manipulation
+# processname: sluice
+# config: /etc/sysconfig/sluice
+# pidfile: /var/run/httpd.pid
+
+# Source function library.
+. /etc/rc.d/init.d/functions
+
+# establish defaults
+pidbase=/var/run/sluice
+lockbase=/var/lock/subsys/sluice
+wait_timeout=10
+prog=sluice
+loglevel=info
+logdir=/var/log/lumberjack/
+sluice_configs="/home/rschwager/devops/bin/dog/sluice/sluiceconfig.py"
+# done_defaults
+
+if [ -f /etc/sysconfig/sluice ]; then
+    . /etc/sysconfig/sluice
+else
+    printf 'Could not find the defaults file in /etc/sysconfig' 
+    failure "Config file check"
+    exit 1
+fi
+
+RETVAL=0
+baseprog=$(basename $prog)
+
+start() {
+    printf "Starting %s\t" $baseprog
+    [ -d $logdir ] || mkdir -v $logdir
+    if [ -z $sluice_configs ]; then 
+	failure "Required parameter check" 
+	echo
+	echo "Must supply at least one config in sluice_configs"
+	exit 1
+    fi
+
+    i=1
+    for file in $sluice_configs; do 
+	echo "Starting up sluice for sluiceconfig $file"
+	$prog --logging=$loglevel \
+	    -c $file >> "${logdir}${baseprog}-${i}.log" 2>&1 &
+	p=$!
+	let RETVAL+=$?
+	if [ $RETVAL = 0 ]; then
+	    touch "${lockbase}-${i}.lock"
+	    echo $p > "${pidbase}-${i}.pid"
+	fi
+	let i++
+    done
+    unset i
+
+    success "sluice started"
+    echo
+
+    return $RETVAL
+}
+
+
+stop () {
+    printf "Stopping %s" $baseprog
+    i=1
+    for file in $sluice_configs; do 
+	killproc -p "${pidbase}-${i}.pid" -d $wait_timeout $prog 
+	RETVAL=$?
+	printf '.'
+	let i++
+    done
+    unset i
+    echo
+    [ $RETVAL = 0 ] && rm -f ${lockbase}* ${pidbase}*
+}
+
+case "$1" in
+  start)
+	start
+	;;
+  stop)
+	stop
+	;;
+  status)
+        status -p ${pidbase}* $prog
+	RETVAL=$?
+	;;
+  restart)
+	stop
+	start
+	;;
+  *)
+	echo $"Usage: $baseprog {start|stop|restart|status}"
+	exit 1
+esac
+
+exit $RETVAL
+
